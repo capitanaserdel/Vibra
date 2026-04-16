@@ -82,7 +82,7 @@ class CircularProgressRing extends StatelessWidget {
                     height: strokeWidth * 2.5,
                     transform: Matrix4.translationValues(strokeWidth * 1.25, 0, 0),
                     decoration: const BoxDecoration(
-                      color: Colors.white,
+                      color: Color(0xFF39FF14),
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:music/features/library/providers/music_provider.dart';
 import 'package:music/features/audio/providers/player_provider.dart';
+import 'package:music/features/ui/screens/settings_screen.dart';
 
 class ExploreView extends ConsumerWidget {
   const ExploreView({super.key});
@@ -19,6 +20,15 @@ class ExploreView extends ConsumerWidget {
         title: const Text('Discover', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_rounded, color: Colors.white70),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(60),
           child: Padding(

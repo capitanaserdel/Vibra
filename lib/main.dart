@@ -13,6 +13,7 @@ void main() async {
   // Initialize Hive for lyrics
   await Hive.initFlutter();
   await Hive.openBox('lyrics_box');
+  await Hive.openBox('settings_box');
 
   // Initialize Audio Service
   audioHandler = await AudioService.init(
@@ -37,12 +38,16 @@ class MusicApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Antigravity Music',
+      title: 'Vibra',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
-        colorSchemeSeed: const Color(0xFF39FF14),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF39FF14),
+          brightness: Brightness.dark,
+          primary: const Color(0xFF39FF14),
+        ),
         scaffoldBackgroundColor: const Color(0xFF0B0B0B),
       ),
       home: const HomeScreen(),

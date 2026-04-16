@@ -38,7 +38,7 @@ class TrackCarousel extends StatelessWidget {
                 color: isActive ? Colors.white.withOpacity(0.2) : Colors.white.withOpacity(0.05),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: isActive ? Colors.white30 : Colors.transparent,
+                  color: isActive ? const Color(0xFF39FF14) : Colors.transparent,
                 ),
               ),
               child: Column(
@@ -58,7 +58,7 @@ class TrackCarousel extends StatelessWidget {
                             Container(
                               color: Colors.black26,
                               child: const Center(
-                                child: Icon(Icons.play_arrow_rounded, color: Colors.white),
+                                child: Icon(Icons.play_arrow_rounded, color: Color(0xFF39FF14)),
                               ),
                             ),
                         ],
