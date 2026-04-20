@@ -103,13 +103,7 @@ class PlayerNotifier extends StateNotifier<void> {
   }
 
   Future<void> cycleRepeatMode() async {
-    final state = audioHandler.playbackState.value;
-    final nextMode = {
-      AudioServiceRepeatMode.none: AudioServiceRepeatMode.all,
-      AudioServiceRepeatMode.all: AudioServiceRepeatMode.one,
-      AudioServiceRepeatMode.one: AudioServiceRepeatMode.none,
-    }[state.repeatMode]!;
-    await audioHandler.setRepeatMode(nextMode);
+    audioHandler.cycleRepeatMode();
   }
 }
 

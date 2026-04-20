@@ -142,7 +142,7 @@ class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
     }
   }
 
-  PlaybackState _transformEvent(PlaybackEvent event) {
+  PlaybackState _transformEvent(PlaybackEvent event, {AudioServiceShuffleMode? shuffleOverride, AudioServiceRepeatMode? repeatOverride}) {
     return PlaybackState(
       controls: [
         MediaControl.skipToPrevious,
@@ -170,8 +170,8 @@ class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
       bufferedPosition: _player.bufferedPosition,
       speed: _player.speed,
       queueIndex: event.currentIndex,
-      shuffleMode: _player.shuffleModeEnabled ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none,
-      repeatMode: {
+      shuffleMode: shuffleOverride ?? (_player.shuffleModeEnabled ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none),
+      repeatMode: repeatOverride ?? {
         LoopMode.off: AudioServiceRepeatMode.none,
         LoopMode.one: AudioServiceRepeatMode.one,
         LoopMode.all: AudioServiceRepeatMode.all,
@@ -179,12 +179,16 @@ class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
     );
   }
 
-  void _broadcastState() {
-    playbackState.add(_transformEvent(PlaybackEvent(
-      processingState: _player.processingState,
-      updatePosition: _player.position,
-      bufferedPosition: _player.bufferedPosition,
-    )));
+  void _broadcastState({AudioServiceShuffleMode? shuffleOverride, AudioServiceRepeatMode? repeatOverride}) {
+    playbackState.add(_transformEvent(
+      PlaybackEvent(
+        processingState: _player.processingState,
+        updatePosition: _player.position,
+        bufferedPosition: _player.bufferedPosition,
+      ),
+      shuffleOverride: shuffleOverride,
+      repeatOverride: repeatOverride,
+    ));
   }
 
   // Stream current position for UI updates
@@ -195,8 +199,8 @@ class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
   @override
   Future<void> setShuffleMode(AudioServiceShuffleMode mode) async {
     final enabled = mode == AudioServiceShuffleMode.all || mode == AudioServiceShuffleMode.group;
-    await _player.setShuffleModeEnabled(enabled);
-    _broadcastState();
+    _player.setShuffleModeEnabled(enabled);
+    _broadcastState(shuffleOverride: mode);
   }
 
   @override
@@ -206,7 +210,18 @@ class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
       AudioServiceRepeatMode.one: LoopMode.one,
       AudioServiceRepeatMode.all: LoopMode.all,
     }[mode]!;
-    await _player.setLoopMode(loopMode);
-    _broadcastState();
+    _player.setLoopMode(loopMode);
+    _broadcastState(repeatOverride: mode);
+  }
+
+  Future<void> cycleRepeatMode() async {
+    final currentMode = playbackState.value.repeatMode;
+    final nextMode = {
+      AudioServiceRepeatMode.none: AudioServiceRepeatMode.all,
+      AudioServiceRepeatMode.all: AudioServiceRepeatMode.one,
+      AudioServiceRepeatMode.one: AudioServiceRepeatMode.none,
+    }[currentMode]!;
+    
+    await setRepeatMode(nextMode);
   }
 }

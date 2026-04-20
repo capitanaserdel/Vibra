@@ -12,7 +12,7 @@ class LinearPlayer extends ConsumerWidget {
     final duration = mediaItem?.duration ?? Duration.zero;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 44),
+      padding: const EdgeInsets.symmetric(horizontal: 38),
       child: Column(
         children: [
           // Album Art

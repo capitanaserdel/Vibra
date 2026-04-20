@@ -34,4 +34,38 @@ class MetadataHelper {
     }
     return artist.trim();
   }
+
+  /// Normalizes a string for robust indexing and searching (lowercase, trim, strip special chars)
+  static String normalize(String input) {
+    return input
+        .toLowerCase()
+        .trim()
+        .replaceAll(RegExp(r'[^\w\s]'), '') // Remove special characters except alphanumeric and spaces
+        .replaceAll(RegExp(r'\s+'), ' '); // Collapse multiple spaces
+  }
+
+  /// Extracts the main artist for cleaner searching (e.g., "Wizkid ft. Tems" -> "Wizkid")
+  static String getMainArtist(String? artist) {
+    if (artist == null || artist.isEmpty || artist == "<unknown>") {
+      return "Unknown Artist";
+    }
+
+    String result = artist;
+
+    // Split on common collaboration markers: " ft. ", " feat. ", " & ", " , "
+    final markers = [
+      RegExp(r'\s+ft\.?\s+', caseSensitive: false),
+      RegExp(r'\s+feat\.?\s+', caseSensitive: false),
+      RegExp(r'\s+&\s+'),
+      RegExp(r'\s*,\s*'),
+    ];
+
+    for (final marker in markers) {
+      if (result.contains(marker)) {
+        result = result.split(marker).first;
+      }
+    }
+
+    return result.trim();
+  }
 }

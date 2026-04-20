@@ -84,12 +84,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         const SizedBox(height: 10),
 
                         // 5. Mandatory Linear Seek Bar (Phase 9 requirement)
-                        //_buildLinearSeekBar(context, position, duration),
+                       //_buildLinearSeekBar(context, position, duration),
 
                         const SizedBox(height: 20),
 
                         // 6. Secondary Control Row
-                       // _buildSecondaryControls(context),
+                        _buildSecondaryControls(context),
 
                         const SizedBox(height: 25),
 
