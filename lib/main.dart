@@ -2,18 +2,31 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:music/features/audio/handler/music_audio_handler.dart';
-import 'package:music/features/ui/screens/home_screen.dart';
+import 'package:music/features/player/handler/music_audio_handler.dart';
+import 'package:music/shared/layouts/main_layout.dart';
+import 'package:music/core/theme/app_theme.dart';
+import 'package:music/features/settings/providers/settings_provider.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 late MusicAudioHandler audioHandler;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Initialize Firebase (Requires google-services.json / GoogleService-Info.plist)
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    print("Firebase initialization failed: $e. Ensure config files are present.");
+  }
+
   // Initialize Hive for lyrics
   await Hive.initFlutter();
   await Hive.openBox('lyrics_box');
   await Hive.openBox('settings_box');
+  await Hive.openBox('play_history_box');
+  await Hive.openBox('metadata_box');
+  await Hive.openBox('hidden_songs_box');
 
   // Initialize Audio Service
   audioHandler = await AudioService.init(
@@ -32,25 +45,18 @@ void main() async {
   );
 }
 
-class MusicApp extends StatelessWidget {
+class MusicApp extends ConsumerWidget {
   const MusicApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+    
     return MaterialApp(
       title: 'Vibra',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF39FF14),
-          brightness: Brightness.dark,
-          primary: const Color(0xFF39FF14),
-        ),
-        scaffoldBackgroundColor: const Color(0xFF0B0B0B),
-      ),
-      home: const HomeScreen(),
+      theme: AppTheme.generateTheme(settings),
+      home: const MainLayout(),
     );
   }
 }

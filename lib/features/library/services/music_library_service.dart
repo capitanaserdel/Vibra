@@ -27,4 +27,12 @@ class MusicLibraryService {
   Future<List<AlbumModel>> fetchAlbums() async {
     return await _audioQuery.queryAlbums();
   }
+
+  Future<List<ArtistModel>> fetchArtists() async {
+    return await _audioQuery.queryArtists();
+  }
+
+  // Folders are typically queried as albums or by parsing device paths.
+  // on_audio_query doesn't have a direct "queryFolders" but we can get all songs 
+  // and group them by folder path in the provider.
 }
