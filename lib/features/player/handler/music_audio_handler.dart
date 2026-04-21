@@ -16,6 +16,8 @@ class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
         stop();
       }
     });
+    // Set default repeat mode to ALL as requested
+    _player.setLoopMode(LoopMode.all);
 
     // Persistent Session Logic
     _player.positionStream.listen((pos) {
