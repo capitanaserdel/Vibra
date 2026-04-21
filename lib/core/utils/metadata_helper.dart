@@ -68,4 +68,33 @@ class MetadataHelper {
 
     return result.trim();
   }
+
+  /// Removes common "noise" from titles (Official Video, [HD], etc.) 
+  /// but preserves case and internal punctuation for more accurate API hits.
+  static String stripNoise(String input) {
+    if (input.isEmpty) return input;
+    
+    String result = input;
+
+    // Common suffixes to remove
+    final noisePatterns = [
+      RegExp(r'\(Official.*?\)', caseSensitive: false),
+      RegExp(r'\[.*?HD.*?\]', caseSensitive: false),
+      RegExp(r'\[.*?HQ.*?\]', caseSensitive: false),
+      RegExp(r'\(Lyric.*?\)', caseSensitive: false),
+      RegExp(r'\(Music Video\)', caseSensitive: false),
+      RegExp(r'\(Explicit\)', caseSensitive: false),
+      RegExp(r'\[Explicit\]', caseSensitive: false),
+      RegExp(r'\(Video\)', caseSensitive: false),
+      RegExp(r'feat\..*$', caseSensitive: false),
+      RegExp(r'ft\..*$', caseSensitive: false),
+    ];
+
+    for (final pattern in noisePatterns) {
+      result = result.replaceAll(pattern, '');
+    }
+
+    // Collapse spaces and trim
+    return result.replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
 }
