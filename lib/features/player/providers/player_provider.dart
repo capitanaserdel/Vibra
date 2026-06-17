@@ -21,6 +21,11 @@ final playerDurationProvider = StreamProvider<Duration?>((ref) {
   return audioHandler.durationStream;
 });
 
+final queueProvider = StreamProvider<List<MediaItem>>((ref) {
+  return audioHandler.queue;
+});
+
+
 class PlayerNotifier extends StateNotifier<void> {
   PlayerNotifier() : super(null);
 
@@ -62,6 +67,20 @@ class PlayerNotifier extends StateNotifier<void> {
       title: station.name,
       artist: station.tags,
       artUri: station.favicon.isNotEmpty ? Uri.parse(station.favicon) : null,
+      extras: {'isLocal': false},
+    );
+
+    await playMediaItem(mediaItem);
+  }
+
+  Future<void> playOnlineTrack(OnlineTrack track) async {
+    final mediaItem = MediaItem(
+      id: track.previewUrl,
+      album: track.album,
+      title: track.title,
+      artist: track.artist,
+      duration: Duration(seconds: track.duration),
+      artUri: track.coverUrl.isNotEmpty ? Uri.parse(track.coverUrl) : null,
       extras: {'isLocal': false},
     );
 

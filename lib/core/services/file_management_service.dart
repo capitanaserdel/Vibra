@@ -2,9 +2,28 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 class FileManagementService {
   static const _channel = MethodChannel('com.example.vibra/file_management');
+
+  /// Gets the public Vibra music download directory: /storage/emulated/0/Music/Vibra
+  Future<Directory?> getDownloadDirectory() async {
+    try {
+      if (Platform.isAndroid) {
+        final directory = await getExternalStorageDirectory();
+        if (directory == null) return null;
+        final rootPath = directory.path.split('/Android/data/').first;
+        return Directory(p.join(rootPath, 'Music', 'Vibra'));
+      } else {
+        final directory = await getApplicationDocumentsDirectory();
+        return Directory(p.join(directory.path, 'Vibra'));
+      }
+    } catch (e) {
+      print('Error getting download directory: $e');
+      return null;
+    }
+  }
 
   /// Renames a song file on disk.
   Future<bool> renameSong(String oldPath, String newNameWithoutExtension) async {

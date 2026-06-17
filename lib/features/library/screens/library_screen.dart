@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -8,6 +9,8 @@ import 'package:music/features/settings/screens/settings_screen.dart';
 import 'package:music/features/player/screens/player_screen.dart';
 import 'package:music/core/utils/metadata_helper.dart';
 import 'package:music/shared/widgets/song_action_sheet.dart';
+import 'package:music/core/providers/service_providers.dart';
+import 'package:music/core/services/file_management_service.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 
 class LibraryScreen extends ConsumerWidget {
@@ -68,14 +71,32 @@ class LibraryScreen extends ConsumerWidget {
             _buildAppBarButton(
               context,
               icon: Icons.sync_rounded,
-              onPressed: () {
-                ref.invalidate(localSongsProvider);
+              onPressed: () async {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: const Text('Scanning library...'),
                     backgroundColor: Theme.of(context).colorScheme.primary,
+                    duration: const Duration(seconds: 2),
                   ),
                 );
+
+                try {
+                  final fileService = ref.read(fileManagementServiceProvider);
+                  final downloadDir = await fileService.getDownloadDirectory();
+                  if (downloadDir != null && await downloadDir.exists()) {
+                    final onAudioQuery = OnAudioQuery();
+                    final files = downloadDir.listSync();
+                    for (final entity in files) {
+                      if (entity is File && entity.path.endsWith('.mp3')) {
+                        await onAudioQuery.scanMedia(entity.path);
+                      }
+                    }
+                  }
+                } catch (e) {
+                  print('Error during manual sync file scan: $e');
+                }
+
+                ref.invalidate(localSongsProvider);
               },
             ),
             _buildAppBarButton(
@@ -278,11 +299,7 @@ class _SongsTabState extends ConsumerState<SongsTab> {
                     itemBuilder: (context, index) {
                       final song = filteredSongs[index];
                       return ListTile(
-                        leading: QueryArtworkWidget(
-                          id: song.id,
-                          type: ArtworkType.AUDIO,
-                          nullArtworkWidget: _defaultArtwork(),
-                        ),
+                        leading: SongArtworkWidget(song: song),
                         title: Text(
                           MetadataHelper.cleanMetadata(song.title, song.displayName),
                           maxLines: 1,
@@ -320,81 +337,86 @@ class _SongsTabState extends ConsumerState<SongsTab> {
                   ),
                 ),
                 // Alphabet Scrollbar
-                GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onVerticalDragStart: (_) => setState(() => _isDragging = true),
-                  onVerticalDragEnd: (_) => setState(() {
-                    _isDragging = false;
-                    _selectedLetter = null;
-                  }),
-                  onVerticalDragCancel: () => setState(() {
-                    _isDragging = false;
-                    _selectedLetter = null;
-                  }),
-                  onVerticalDragUpdate: (details) {
-                    final renderBox = context.findRenderObject() as RenderBox;
-                    final localPosition = renderBox.globalToLocal(details.globalPosition);
-                    final letterHeight = renderBox.size.height / _alphabet.length;
-                    int index = (localPosition.dy / letterHeight).floor();
-                    if (index >= 0 && index < _alphabet.length) {
-                      final letter = _alphabet[index];
-                      if (_selectedLetter != letter) {
+                if (query.isEmpty)
+                  GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onVerticalDragStart: (_) => setState(() => _isDragging = true),
+                    onVerticalDragEnd: (_) => setState(() {
+                      _isDragging = false;
+                      _selectedLetter = null;
+                    }),
+                    onVerticalDragCancel: () => setState(() {
+                      _isDragging = false;
+                      _selectedLetter = null;
+                    }),
+                    onVerticalDragUpdate: (details) {
+                      final renderBox = context.findRenderObject() as RenderBox;
+                      final localPosition = renderBox.globalToLocal(details.globalPosition);
+                      final letterHeight = renderBox.size.height / _alphabet.length;
+                      int index = (localPosition.dy / letterHeight).floor();
+                      if (index >= 0 && index < _alphabet.length) {
+                        final letter = _alphabet[index];
+                        if (_selectedLetter != letter) {
+                          setState(() {
+                            _selectedLetter = letter;
+                          });
+                          _scrollToLetter(filteredSongs, letter);
+                        }
+                      }
+                    },
+                    onTapDown: (details) {
+                      final renderBox = context.findRenderObject() as RenderBox;
+                      final localPosition = renderBox.globalToLocal(details.globalPosition);
+                      final letterHeight = renderBox.size.height / _alphabet.length;
+                      int index = (localPosition.dy / letterHeight).floor();
+                      if (index >= 0 && index < _alphabet.length) {
+                        final letter = _alphabet[index];
                         setState(() {
+                          _isDragging = true;
                           _selectedLetter = letter;
                         });
                         _scrollToLetter(filteredSongs, letter);
                       }
-                    }
-                  },
-                  onTapDown: (details) {
-                    final renderBox = context.findRenderObject() as RenderBox;
-                    final localPosition = renderBox.globalToLocal(details.globalPosition);
-                    final letterHeight = renderBox.size.height / _alphabet.length;
-                    int index = (localPosition.dy / letterHeight).floor();
-                    if (index >= 0 && index < _alphabet.length) {
-                      final letter = _alphabet[index];
-                      setState(() {
-                        _isDragging = true;
-                        _selectedLetter = letter;
-                      });
-                      _scrollToLetter(filteredSongs, letter);
-                    }
-                  },
-                  onTapUp: (_) => setState(() {
-                    _isDragging = false;
-                    _selectedLetter = null;
-                  }),
-                  child: Container(
-                    width: 30,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    alignment: Alignment.center,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: _alphabet.map((letter) {
-                        final isSelected = _selectedLetter == letter;
-                        return Container(
-                          width: 18,
-                          height: 18,
-                          alignment: Alignment.center,
-                          decoration: isSelected ? BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary,
-                            shape: BoxShape.circle,
-                          ) : null,
-                          child: Text(
-                            letter,
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                              color: isSelected 
-                                ? Theme.of(context).colorScheme.onPrimary 
-                                : Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                    },
+                    onTapUp: (_) => setState(() {
+                      _isDragging = false;
+                      _selectedLetter = null;
+                    }),
+                    child: Container(
+                      width: 30,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      alignment: Alignment.center,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: _alphabet.map((letter) {
+                          final isSelected = _selectedLetter == letter;
+                          return Expanded(
+                            child: Center(
+                              child: Container(
+                                width: 18,
+                                height: 18,
+                                alignment: Alignment.center,
+                                decoration: isSelected ? BoxDecoration(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  shape: BoxShape.circle,
+                                ) : null,
+                                child: Text(
+                                  letter,
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    color: isSelected 
+                                      ? Theme.of(context).colorScheme.onPrimary 
+                                      : Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
-                        );
-                      }).toList(),
+                          );
+                        }).toList(),
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
             // Floating Letter Indicator Bubble
@@ -567,11 +589,7 @@ class FavoritesTab extends ConsumerWidget {
                 final song = favSongs[index];
                 final songId = song.uri ?? song.data;
                 return ListTile(
-                  leading: QueryArtworkWidget(
-                    id: song.id,
-                    type: ArtworkType.AUDIO,
-                    nullArtworkWidget: _defaultArtwork(),
-                  ),
+                  leading: SongArtworkWidget(song: song),
                   title: Text(
                     MetadataHelper.cleanMetadata(song.title, song.displayName),
                     maxLines: 1,
@@ -849,11 +867,7 @@ class PlaylistDetailScreen extends ConsumerWidget {
                   itemBuilder: (context, index) {
                     final song = songs[index];
                     return ListTile(
-                      leading: QueryArtworkWidget(
-                        id: song.id,
-                        type: ArtworkType.AUDIO,
-                        nullArtworkWidget: _defaultArtwork(),
-                      ),
+                      leading: SongArtworkWidget(song: song),
                       title: Text(
                         MetadataHelper.cleanMetadata(song.title, song.displayName),
                         maxLines: 1,
@@ -964,4 +978,42 @@ Widget _defaultArtwork({double size = 40}) {
       height: size,
     ),
   );
+}
+
+class SongArtworkWidget extends StatelessWidget {
+  final SongModel song;
+  final double size;
+
+  const SongArtworkWidget({super.key, required this.song, this.size = 50});
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder(
+      valueListenable: Hive.box('metadata_box').listenable(),
+      builder: (context, box, _) {
+        final songId = song.uri ?? song.data;
+        final meta = box.get(songId);
+        final customArtPath = (meta is Map) ? meta['customArtworkPath'] as String? : null;
+        final hasCustomArt = customArtPath != null && customArtPath.isNotEmpty && File(customArtPath).existsSync();
+
+        if (hasCustomArt) {
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.file(
+              File(customArtPath),
+              fit: BoxFit.cover,
+              width: size,
+              height: size,
+            ),
+          );
+        }
+
+        return QueryArtworkWidget(
+          id: song.id,
+          type: ArtworkType.AUDIO,
+          nullArtworkWidget: _defaultArtwork(size: size),
+        );
+      },
+    );
+  }
 }

@@ -49,9 +49,14 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
         if (hasImage)
           Positioned.fill(
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+              filter: ImageFilter.blur(
+                sigmaX: settings.appBackgroundBlur,
+                sigmaY: settings.appBackgroundBlur,
+              ),
               child: Container(
-                color: Colors.black.withOpacity(0.45),
+                color: Theme.of(context).brightness == Brightness.light
+                    ? Colors.white.withOpacity(0.4)
+                    : Colors.black.withOpacity(0.3),
               ),
             ),
           ),

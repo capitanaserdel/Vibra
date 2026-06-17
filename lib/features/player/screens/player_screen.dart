@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:music/main.dart';
 import 'package:music/features/player/providers/player_provider.dart';
 import 'package:music/features/library/providers/music_provider.dart';
@@ -81,7 +82,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       body: Stack(
         children: [
           // 1. Dynamic Background (Blur for Dark, Gradient for Light)
-          _buildBackground(context, mediaItem.artUri?.toString()),
+          _buildBackground(context, mediaItem.artUri?.toString(), mediaItem),
 
           SafeArea(
             child: Column(
@@ -161,7 +162,91 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     );
   }
 
-  Widget _buildBackground(BuildContext context, String? imageUrl) {
+  int? _parseAlbumId(String? imageUrl) {
+    if (imageUrl == null) return null;
+    if (imageUrl.contains('albumart/')) {
+      return int.tryParse(imageUrl.split('albumart/').last);
+    }
+    return int.tryParse(imageUrl);
+  }
+
+  Future<void> _changeSongArtwork(MediaItem mediaItem) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery);
+    if (picked != null) {
+      final appDir = await getApplicationDocumentsDirectory();
+      final fileName = 'custom_art_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final savedFile = await File(picked.path).copy('${appDir.path}/$fileName');
+
+      final metadataBox = Hive.box('metadata_box');
+      final current = metadataBox.get(mediaItem.id);
+      final existing = (current is Map) ? Map<String, dynamic>.from(current) : <String, dynamic>{};
+      existing['customArtworkPath'] = savedFile.path;
+      await metadataBox.put(mediaItem.id, existing);
+
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Song artwork updated successfully!'),
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
+  }
+
+  Future<void> _removeSongArtwork(MediaItem mediaItem) async {
+    final metadataBox = Hive.box('metadata_box');
+    final current = metadataBox.get(mediaItem.id);
+    if (current is Map) {
+      final existing = Map<String, dynamic>.from(current);
+      existing.remove('customArtworkPath');
+      await metadataBox.put(mediaItem.id, existing);
+    }
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('Custom artwork removed.'),
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+
+  Widget _buildPlayerArtwork(String? imageUrl, MediaItem mediaItem, {double borderRadius = 20}) {
+    final metadataBox = Hive.box('metadata_box');
+    final meta = metadataBox.get(mediaItem.id);
+    final customArtPath = (meta is Map) ? meta['customArtworkPath'] as String? : null;
+    final hasCustomArt = customArtPath != null && customArtPath.isNotEmpty && File(customArtPath).existsSync();
+
+    final isNetwork = imageUrl != null && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'));
+    final albumId = _parseAlbumId(imageUrl);
+
+    Widget artwork;
+    if (hasCustomArt) {
+      artwork = Image.file(File(customArtPath), fit: BoxFit.cover, width: double.infinity, height: double.infinity);
+    } else if (isNetwork) {
+      artwork = Image.network(
+        imageUrl!,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (_, __, ___) => Image.asset('assets/images/default_album_art.png', fit: BoxFit.cover),
+      );
+    } else if (albumId != null && albumId != 0) {
+      artwork = QueryArtworkWidget(
+        id: albumId,
+        type: ArtworkType.ALBUM,
+        artworkWidth: double.infinity,
+        artworkHeight: double.infinity,
+        artworkFit: BoxFit.cover,
+        nullArtworkWidget: Image.asset('assets/images/default_album_art.png', fit: BoxFit.cover),
+      );
+    } else {
+      artwork = Image.asset('assets/images/default_album_art.png', fit: BoxFit.cover);
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(borderRadius),
+      child: artwork,
+    );
+  }
+
+  Widget _buildBackground(BuildContext context, String? imageUrl, MediaItem mediaItem) {
     final theme = Theme.of(context);
     final isLight = theme.brightness == Brightness.light;
     final settings = ref.watch(settingsProvider);
@@ -213,43 +298,107 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                 : Container(color: theme.colorScheme.background),
           ),
           BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-            child: Container(color: Colors.black.withOpacity(0.55)),
+            filter: ImageFilter.blur(
+              sigmaX: settings.playerBackgroundBlur,
+              sigmaY: settings.playerBackgroundBlur,
+            ),
+            child: Container(
+              color: theme.brightness == Brightness.light
+                  ? Colors.white.withOpacity(0.4)
+                  : Colors.black.withOpacity(0.35),
+            ),
           ),
         ],
       );
     }
 
     // ── Dynamic (default): blurred album art ──────────────────
-    return Stack(
-      children: [
-        Container(
-          color: theme.colorScheme.background,
-          child: imageUrl != null && imageUrl.isNotEmpty
-              ? QueryArtworkWidget(
-                  id: int.tryParse(imageUrl) ?? 0,
-                  type: ArtworkType.AUDIO,
-                  nullArtworkWidget: const SizedBox.shrink(),
-                )
-              : const Image(image: AssetImage('assets/images/default_album_art.png'), fit: BoxFit.cover),
-        ),
-        BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
-          child: Container(color: Colors.black.withOpacity(0.6)),
-        ),
-        Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.black.withOpacity(0.3),
-                theme.colorScheme.background,
-              ],
+    final metadataBox = Hive.box('metadata_box');
+    final meta = metadataBox.get(mediaItem.id);
+    final customArtPath = (meta is Map) ? meta['customArtworkPath'] as String? : null;
+    final hasCustomArt = customArtPath != null && customArtPath.isNotEmpty && File(customArtPath).existsSync();
+
+    final isNetwork = imageUrl != null && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'));
+    final albumId = _parseAlbumId(imageUrl);
+    final hasSystemArt = isNetwork || (albumId != null && albumId != 0);
+
+    Widget? artworkLayer;
+    if (hasCustomArt) {
+      artworkLayer = Image.file(File(customArtPath), fit: BoxFit.cover);
+    } else if (isNetwork) {
+      artworkLayer = Image.network(imageUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox.shrink());
+    } else if (hasSystemArt) {
+      artworkLayer = QueryArtworkWidget(
+        id: albumId!,
+        type: ArtworkType.ALBUM,
+        artworkWidth: double.infinity,
+        artworkHeight: double.infinity,
+        artworkFit: BoxFit.cover,
+        nullArtworkWidget: const SizedBox.shrink(),
+      );
+    }
+
+    if (artworkLayer != null) {
+      return Stack(
+        children: [
+          Positioned.fill(child: artworkLayer),
+          BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
+            child: Container(color: Colors.black.withOpacity(0.6)),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withOpacity(0.3),
+                  theme.colorScheme.background,
+                ],
+              ),
             ),
           ),
+        ],
+      );
+    }
+
+    // If there is NO artwork (custom or system), leave the app's own custom wallpaper image on!
+    final appBgPath = settings.appBackgroundImagePath;
+    final hasAppBg = appBgPath.isNotEmpty && File(appBgPath).existsSync();
+    if (hasAppBg) {
+      return Stack(
+        children: [
+          Positioned.fill(
+            child: Image.file(File(appBgPath), fit: BoxFit.cover),
+          ),
+          BackdropFilter(
+            filter: ImageFilter.blur(
+              sigmaX: settings.appBackgroundBlur,
+              sigmaY: settings.appBackgroundBlur,
+            ),
+            child: Container(
+              color: theme.brightness == Brightness.light
+                  ? Colors.white.withOpacity(0.4)
+                  : Colors.black.withOpacity(0.3),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Default dark fallback gradient
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            theme.colorScheme.primary.withOpacity(0.25),
+            theme.colorScheme.background,
+            theme.colorScheme.primary.withOpacity(0.05),
+          ],
         ),
-      ],
+      ),
     );
   }
 
@@ -324,13 +473,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           alignment: Alignment.center,
           children: [
             // Artwork
-            imageUrl != null && imageUrl.isNotEmpty ? 
-              QueryArtworkWidget(
-                id: int.tryParse(imageUrl) ?? 0,
-                type: ArtworkType.AUDIO,
-                nullArtworkWidget: Image.asset('assets/images/default_album_art.png', fit: BoxFit.cover),
-              ) : 
-              Image.asset('assets/images/default_album_art.png', fit: BoxFit.cover),
+            _buildPlayerArtwork(imageUrl, mediaItem!),
             
             // Time Overlay
             Container(
@@ -832,32 +975,49 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   Widget _buildBottomCarousel(BuildContext context, String currentTrackId) {
     final theme = Theme.of(context);
-    final localSongs = ref.watch(localSongsProvider).value ?? [];
     
-    final library = localSongs.map((song) => MediaItem(
-      id: song.uri ?? song.data,
-      album: song.album ?? 'Unknown Album',
-      title: song.title,
-      artist: song.artist ?? 'Unknown Artist',
-      duration: Duration(milliseconds: song.duration ?? 0),
-      artUri: Uri.parse('content://media/external/audio/albumart/${song.albumId}'),
-    )).toList();
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-          child: Text("Up Next", style: TextStyle(color: theme.colorScheme.onBackground.withOpacity(0.4), fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
-        ),
-        TrackCarousel(
-          tracks: library,
-          currentTrackId: currentTrackId,
-          onTrackTap: (track) {
-            ref.read(playerNotifierProvider.notifier).playMediaItem(track);
-          },
-        ),
-      ],
+    return StreamBuilder<List<MediaItem>>(
+      stream: audioHandler.queue,
+      initialData: audioHandler.queue.value,
+      builder: (context, snapshot) {
+        final queue = snapshot.data ?? [];
+        final currentIndex = queue.indexWhere((item) => item.id == currentTrackId);
+        final displayedTracks = currentIndex != -1 && currentIndex + 1 < queue.length
+            ? queue.sublist(currentIndex + 1)
+            : <MediaItem>[];
+
+        if (displayedTracks.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              child: Text(
+                "Up Next",
+                style: TextStyle(
+                  color: theme.colorScheme.onBackground.withOpacity(0.4),
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.1,
+                ),
+              ),
+            ),
+            TrackCarousel(
+              tracks: displayedTracks,
+              currentTrackId: currentTrackId,
+              onTrackTap: (track) {
+                final targetIndex = queue.indexWhere((item) => item.id == track.id);
+                if (targetIndex != -1) {
+                  audioHandler.skipToQueueItem(targetIndex);
+                }
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -875,6 +1035,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       builder: (context) {
         return Consumer(
           builder: (context, ref, child) {
+            final mediaItem = ref.watch(currentMediaItemProvider).value;
+            if (mediaItem == null) return const SizedBox.shrink();
+
             final theme = Theme.of(context);
             final settings = ref.watch(settingsProvider);
             final settingsNotifier = ref.read(settingsProvider.notifier);
@@ -986,6 +1149,118 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                           );
                         }),
                       ),
+                      const SizedBox(height: 20),
+
+                      // Player Style Label
+                      Row(
+                        children: [
+                          Icon(Icons.aspect_ratio_outlined, color: theme.colorScheme.primary, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Player Layout Style',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Player Style Selector Segmented Chips
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: GestureDetector(
+                                onTap: () => settingsNotifier.setPlayerStyle('Circle'),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: settings.playerStyle == 'Circle'
+                                        ? theme.colorScheme.primary
+                                        : theme.colorScheme.onSurface.withOpacity(0.06),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: settings.playerStyle == 'Circle'
+                                          ? theme.colorScheme.primary
+                                          : theme.colorScheme.outline.withOpacity(0.2),
+                                    ),
+                                  ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.circle_outlined,
+                                        size: 20,
+                                        color: settings.playerStyle == 'Circle'
+                                            ? theme.colorScheme.onPrimary
+                                            : theme.colorScheme.onSurface.withOpacity(0.6),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Circular Player',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: settings.playerStyle == 'Circle'
+                                              ? theme.colorScheme.onPrimary
+                                              : theme.colorScheme.onSurface.withOpacity(0.6),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => settingsNotifier.setPlayerStyle('Linear'),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: settings.playerStyle == 'Linear'
+                                      ? theme.colorScheme.primary
+                                      : theme.colorScheme.onSurface.withOpacity(0.06),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: settings.playerStyle == 'Linear'
+                                        ? theme.colorScheme.primary
+                                        : theme.colorScheme.outline.withOpacity(0.2),
+                                  ),
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.reorder_rounded,
+                                      size: 20,
+                                      color: settings.playerStyle == 'Linear'
+                                          ? theme.colorScheme.onPrimary
+                                          : theme.colorScheme.onSurface.withOpacity(0.6),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Linear Player',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: settings.playerStyle == 'Linear'
+                                            ? theme.colorScheme.onPrimary
+                                            : theme.colorScheme.onSurface.withOpacity(0.6),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
 
                       // Image picker (only visible if Theme == 'Image')
                       if (currentTheme == 'Image') ...[
@@ -1054,9 +1329,84 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                                   ),
                           ),
                         ),
+                        if (hasPlayerImage) ...[
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Icon(Icons.blur_on_rounded, size: 18, color: theme.colorScheme.onSurface.withOpacity(0.6)),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Blur Intensity: ${settings.playerBackgroundBlur.toInt()}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: theme.colorScheme.onSurface.withOpacity(0.6),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SliderTheme(
+                            data: SliderTheme.of(context).copyWith(
+                              trackHeight: 2,
+                              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                              overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                            ),
+                            child: Slider(
+                              value: settings.playerBackgroundBlur,
+                              min: 0.0,
+                              max: 20.0,
+                              onChanged: settingsNotifier.setPlayerBackgroundBlur,
+                            ),
+                          ),
+                        ],
                       ],
                       
                       const SizedBox(height: 20),
+                      const Divider(height: 1),
+                      const SizedBox(height: 12),
+
+                      // Song Artwork Customization
+                      Row(
+                        children: [
+                          Icon(Icons.photo_library_outlined, color: theme.colorScheme.primary, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Song Artwork',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      ListTile(
+                        leading: Icon(Icons.add_photo_alternate_outlined, color: theme.colorScheme.primary),
+                        title: const Text('Change Song Artwork'),
+                        subtitle: const Text('Pick a custom image for this song'),
+                        onTap: () {
+                          Navigator.pop(context);
+                          _changeSongArtwork(mediaItem);
+                        },
+                      ),
+                      Consumer(
+                        builder: (context, ref, child) {
+                          final metadataBox = Hive.box('metadata_box');
+                          final meta = metadataBox.get(mediaItem.id);
+                          final customArtPath = (meta is Map) ? meta['customArtworkPath'] as String? : null;
+                          final hasCustomArt = customArtPath != null && customArtPath.isNotEmpty && File(customArtPath).existsSync();
+                          if (!hasCustomArt) return const SizedBox.shrink();
+                          return ListTile(
+                            leading: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                            title: const Text('Remove Custom Artwork', style: TextStyle(color: Colors.redAccent)),
+                            subtitle: const Text('Restore system default artwork'),
+                            onTap: () {
+                              Navigator.pop(context);
+                              _removeSongArtwork(mediaItem);
+                            },
+                          );
+                        },
+                      ),
                       const Divider(height: 1),
                       const SizedBox(height: 12),
 

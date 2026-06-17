@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:on_audio_query/on_audio_query.dart';
 import 'package:music/features/player/providers/player_provider.dart';
 
 class LinearPlayer extends ConsumerWidget {
@@ -10,6 +13,24 @@ class LinearPlayer extends ConsumerWidget {
     final mediaItem = ref.watch(currentMediaItemProvider).value;
     final position = ref.watch(playerPositionProvider).value ?? Duration.zero;
     final duration = mediaItem?.duration ?? Duration.zero;
+
+    if (mediaItem == null) return const SizedBox.shrink();
+
+    final metadataBox = Hive.box('metadata_box');
+    final meta = metadataBox.get(mediaItem.id);
+    final customArtPath = (meta is Map) ? meta['customArtworkPath'] as String? : null;
+    final hasCustomArt = customArtPath != null && customArtPath.isNotEmpty && File(customArtPath).existsSync();
+
+    final imageUrl = mediaItem.artUri?.toString();
+    final isNetwork = imageUrl != null && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'));
+    int? albumId;
+    if (imageUrl != null && !isNetwork) {
+      if (imageUrl.contains('albumart/')) {
+        albumId = int.tryParse(imageUrl.split('albumart/').last);
+      } else {
+        albumId = int.tryParse(imageUrl);
+      }
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 38),
@@ -28,10 +49,41 @@ class LinearPlayer extends ConsumerWidget {
                     offset: const Offset(0, 15),
                   ),
                 ],
-                image: const DecorationImage(
-                  image: AssetImage('assets/images/default_album_art.png'),
-                  fit: BoxFit.cover,
-                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: hasCustomArt
+                    ? Image.file(
+                        File(customArtPath),
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                      )
+                    : isNetwork
+                        ? Image.network(
+                            imageUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Image.asset(
+                              'assets/images/default_album_art.png',
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : (albumId != null
+                            ? QueryArtworkWidget(
+                                id: albumId,
+                                type: ArtworkType.ALBUM,
+                                nullArtworkWidget: Image.asset(
+                                  'assets/images/default_album_art.png',
+                                  fit: BoxFit.cover,
+                                ),
+                                artworkWidth: double.infinity,
+                                artworkHeight: double.infinity,
+                                artworkFit: BoxFit.cover,
+                              )
+                            : Image.asset(
+                                'assets/images/default_album_art.png',
+                                fit: BoxFit.cover,
+                              )),
               ),
             ),
           ),

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -5,12 +6,18 @@ class MusicLibraryService {
   final OnAudioQuery _audioQuery = OnAudioQuery();
 
   Future<bool> requestPermission() async {
+    if (Platform.isAndroid && await Permission.manageExternalStorage.isGranted) {
+      return true;
+    }
     if (await Permission.audio.isGranted ||
         await Permission.storage.isGranted) {
       return true;
     }
     if (await Permission.audio.request().isGranted ||
         await Permission.storage.request().isGranted) {
+      return true;
+    }
+    if (Platform.isAndroid && await Permission.manageExternalStorage.request().isGranted) {
       return true;
     }
     return false;

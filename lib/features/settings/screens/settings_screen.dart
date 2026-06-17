@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:music/features/settings/providers/settings_provider.dart';
 import 'package:music/features/settings/widgets/settings_widgets.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -30,9 +31,14 @@ class SettingsScreen extends ConsumerWidget {
           ),
           Positioned.fill(
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+              filter: ImageFilter.blur(
+                sigmaX: settings.appBackgroundBlur,
+                sigmaY: settings.appBackgroundBlur,
+              ),
               child: Container(
-                color: Colors.black.withOpacity(0.45),
+                color: theme.brightness == Brightness.light
+                    ? Colors.white.withOpacity(0.4)
+                    : Colors.black.withOpacity(0.3),
               ),
             ),
           ),
@@ -234,6 +240,24 @@ class SettingsScreen extends ConsumerWidget {
               ],
             ),
 
+            // Music Identification Settings
+            SettingsSection(
+              title: 'Music Identification',
+              children: [
+                SettingsTile(
+                  icon: Icons.mic_outlined,
+                  title: 'AudD API Token',
+                  subtitle: 'Tap to set or upgrade your recognition token',
+                  onTap: () => _showTokenDialog(context),
+                  trailing: Icon(
+                    Icons.edit_rounded,
+                    size: 20,
+                    color: theme.colorScheme.onSurface.withOpacity(0.4),
+                  ),
+                ),
+              ],
+            ),
+
             // 5. SYNC & ACCOUNT
             SettingsSection(
               title: 'Sync & Account',
@@ -302,6 +326,71 @@ class SettingsScreen extends ConsumerWidget {
   void _showFeedback(BuildContext context, String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg), backgroundColor: Theme.of(context).primaryColor.withOpacity(0.8)),
+    );
+  }
+
+  void _showTokenDialog(BuildContext context) {
+    final box = Hive.box('settings_box');
+    final currentToken = box.get('audd_api_token', defaultValue: 'test');
+    final controller = TextEditingController(text: currentToken == 'test' ? '' : currentToken);
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return AlertDialog(
+          backgroundColor: theme.colorScheme.surface,
+          title: const Text('AudD API Token'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'By default, Vibra uses a shared "test" token capped at 10 requests/day. Enter your own free/paid token from audd.io to upgrade.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: theme.colorScheme.onSurface.withOpacity(0.6),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                style: TextStyle(color: theme.colorScheme.onSurface),
+                decoration: InputDecoration(
+                  labelText: 'API Token',
+                  hintText: 'e.g. test',
+                  labelStyle: TextStyle(color: theme.colorScheme.primary),
+                  hintStyle: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.3)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                final token = controller.text.trim();
+                box.put('audd_api_token', token.isEmpty ? 'test' : token);
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('AudD API Token updated successfully!'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -414,6 +503,36 @@ class _AppBackgroundTile extends StatelessWidget {
                     ),
             ),
           ),
+          if (hasImage) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(Icons.blur_on_rounded, size: 18, color: theme.colorScheme.onSurface.withOpacity(0.6)),
+                const SizedBox(width: 8),
+                Text(
+                  'Blur Intensity: ${settings.appBackgroundBlur.toInt()}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                  ),
+                ),
+              ],
+            ),
+            SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 2,
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+              ),
+              child: Slider(
+                value: settings.appBackgroundBlur,
+                min: 0.0,
+                max: 20.0,
+                onChanged: notifier.setAppBackgroundBlur,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -575,7 +694,7 @@ class _PlayerThemeTile extends StatelessWidget {
                       ),
               ),
             ),
-            if (hasPlayerImage)
+            if (hasPlayerImage) ...[
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
@@ -586,6 +705,35 @@ class _PlayerThemeTile extends StatelessWidget {
                       foregroundColor: theme.colorScheme.onSurface.withOpacity(0.5)),
                 ),
               ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.blur_on_rounded, size: 18, color: theme.colorScheme.onSurface.withOpacity(0.6)),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Blur Intensity: ${settings.playerBackgroundBlur.toInt()}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    ),
+                  ),
+                ],
+              ),
+              SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  trackHeight: 2,
+                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                ),
+                child: Slider(
+                  value: settings.playerBackgroundBlur,
+                  min: 0.0,
+                  max: 20.0,
+                  onChanged: notifier.setPlayerBackgroundBlur,
+                ),
+              ),
+            ],
           ],
 
           // Helper text

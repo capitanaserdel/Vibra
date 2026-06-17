@@ -1,5 +1,6 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
+import 'package:on_audio_query/on_audio_query.dart';
 
 class TrackCarousel extends StatelessWidget {
   final List<MediaItem> tracks;
@@ -26,6 +27,15 @@ class TrackCarousel extends StatelessWidget {
         itemBuilder: (context, index) {
           final track = tracks[index];
           final isActive = track.id == currentTrackId;
+          
+          // Parse album ID from artUri
+          int? albumId;
+          if (track.artUri != null) {
+            final uriStr = track.artUri!.toString();
+            if (uriStr.contains('albumart/')) {
+              albumId = int.tryParse(uriStr.split('albumart/').last);
+            }
+          }
 
           return GestureDetector(
             onTap: () => onTrackTap(track),
@@ -48,17 +58,31 @@ class TrackCarousel extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                       child: Stack(
                         children: [
-                          Image.asset(
-                            'assets/images/default_album_art.png',
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            height: double.infinity,
-                          ),
+                          albumId != null
+                              ? QueryArtworkWidget(
+                                  id: albumId,
+                                  type: ArtworkType.ALBUM,
+                                  nullArtworkWidget: Image.asset(
+                                    'assets/images/default_album_art.png',
+                                    fit: BoxFit.cover,
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                  ),
+                                  artworkWidth: double.infinity,
+                                  artworkHeight: double.infinity,
+                                  artworkFit: BoxFit.cover,
+                                )
+                              : Image.asset(
+                                  'assets/images/default_album_art.png',
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                ),
                           if (isActive)
                             Container(
                               color: Colors.black26,
                               child: const Center(
-                                child: Icon(Icons.play_arrow_rounded, color: Color(0xFF39FF14)),
+                                child: Icon(Icons.play_arrow_rounded, color: const Color(0xFF39FF14)),
                               ),
                             ),
                         ],

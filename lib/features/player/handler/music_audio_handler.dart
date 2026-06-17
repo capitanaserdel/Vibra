@@ -2,6 +2,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'dart:convert';
+import 'package:flutter/services.dart';
 
 class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
   final _player = AudioPlayer();
@@ -40,6 +41,9 @@ class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
     // Track audio session ID for equalizer use
     _player.androidAudioSessionIdStream.listen((id) {
       audioSessionId = id;
+      if (id != null && id != 0) {
+        _applyEqualizerSettings(id);
+      }
     });
 
     mediaItem.listen((item) {
@@ -71,6 +75,28 @@ class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
     final lastItemJson = box.get('last_media_item');
     final lastPos = box.get('last_position', defaultValue: 0);
 
+    // Load Shuffle Mode
+    final savedShuffleIndex = box.get('shuffle_mode');
+    if (savedShuffleIndex != null) {
+      final shuffleMode = AudioServiceShuffleMode.values[savedShuffleIndex as int];
+      final enabled = shuffleMode == AudioServiceShuffleMode.all || shuffleMode == AudioServiceShuffleMode.group;
+      _player.setShuffleModeEnabled(enabled);
+    }
+
+    // Load Repeat Mode
+    final savedRepeatIndex = box.get('repeat_mode');
+    if (savedRepeatIndex != null) {
+      final repeatMode = AudioServiceRepeatMode.values[savedRepeatIndex as int];
+      final loopMode = {
+        AudioServiceRepeatMode.none: LoopMode.off,
+        AudioServiceRepeatMode.one: LoopMode.one,
+        AudioServiceRepeatMode.all: LoopMode.all,
+      }[repeatMode]!;
+      _player.setLoopMode(loopMode);
+    } else {
+      _player.setLoopMode(LoopMode.all);
+    }
+
     if (lastItemJson != null) {
       final map = json.decode(lastItemJson);
       final item = MediaItem(
@@ -84,6 +110,33 @@ class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
       mediaItem.add(item);
       await _player.setAudioSource(_createAudioSource(item.id));
       await _player.seek(Duration(milliseconds: lastPos));
+    }
+  }
+
+  Future<void> _applyEqualizerSettings(int sessionId) async {
+    const channel = MethodChannel('com.example.vibra/file_management');
+    try {
+      final result = await channel.invokeMethod<Map>('equalizerInit', {
+        'audioSessionId': sessionId,
+      });
+      if (result != null) {
+        final rawBands = (result['bands'] as List).cast<Map>();
+        final box = Hive.box('settings_box');
+        for (final b in rawBands) {
+          final index = (b['index'] as num).toInt();
+          final saved = box.get('eq_band_$index');
+          if (saved != null) {
+            await channel.invokeMethod('equalizerSetBandLevel', {
+              'band': index,
+              'level': saved as int,
+            });
+          }
+        }
+        final savedEnabled = box.get('eq_enabled', defaultValue: true) as bool;
+        await channel.invokeMethod('equalizerSetEnabled', {'enabled': savedEnabled});
+      }
+    } catch (e) {
+      print("Error applying equalizer settings in audio handler: $e");
     }
   }
 
@@ -212,6 +265,7 @@ class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
     final enabled = mode == AudioServiceShuffleMode.all || mode == AudioServiceShuffleMode.group;
     _player.setShuffleModeEnabled(enabled);
     _broadcastState(shuffleOverride: mode);
+    Hive.box('settings_box').put('shuffle_mode', mode.index);
   }
 
   @override
@@ -223,6 +277,7 @@ class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
     }[mode]!;
     _player.setLoopMode(loopMode);
     _broadcastState(repeatOverride: mode);
+    Hive.box('settings_box').put('repeat_mode', mode.index);
   }
 
   Future<void> cycleRepeatMode() async {

@@ -152,3 +152,11 @@ final searchedStationsProvider = FutureProvider<List<OnlineStation>>((ref) async
   final service = ref.watch(onlineMusicServiceProvider);
   return service.searchStations(query);
 });
+
+final searchedSongsProvider = FutureProvider<List<OnlineTrack>>((ref) async {
+  final query = ref.watch(searchQueryProvider);
+  if (query.isEmpty) return [];
+  
+  final service = ref.watch(onlineMusicServiceProvider);
+  return service.searchSongs(query);
+});

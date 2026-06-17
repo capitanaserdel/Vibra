@@ -13,12 +13,18 @@ class SettingsState {
 
   /// Path to user-picked wallpaper image for the app background. Empty = none.
   final String appBackgroundImagePath;
+  
+  /// Blur amount for the app background wallpaper (0.0 to 30.0)
+  final double appBackgroundBlur;
 
   /// Player page visual theme: 'Dynamic' | 'Solid' | 'Image'
   final String playerTheme;
 
   /// Path to user-picked image for the player background (only used when playerTheme == 'Image')
   final String playerBackgroundImagePath;
+
+  /// Blur amount for the custom player background wallpaper (0.0 to 30.0)
+  final double playerBackgroundBlur;
 
   // Playback
   final bool autoPlayNext;
@@ -44,8 +50,10 @@ class SettingsState {
     this.visualizerEnabled = true,
     this.playerStyle = 'Circle',
     this.appBackgroundImagePath = '',
+    this.appBackgroundBlur = 3.0,
     this.playerTheme = 'Dynamic',
     this.playerBackgroundImagePath = '',
+    this.playerBackgroundBlur = 3.0,
     this.autoPlayNext = true,
     this.resumeSession = true,
     this.streamingQuality = 'High',
@@ -64,8 +72,10 @@ class SettingsState {
     bool? visualizerEnabled,
     String? playerStyle,
     String? appBackgroundImagePath,
+    double? appBackgroundBlur,
     String? playerTheme,
     String? playerBackgroundImagePath,
+    double? playerBackgroundBlur,
     bool? autoPlayNext,
     bool? resumeSession,
     String? streamingQuality,
@@ -83,8 +93,10 @@ class SettingsState {
       visualizerEnabled: visualizerEnabled ?? this.visualizerEnabled,
       playerStyle: playerStyle ?? this.playerStyle,
       appBackgroundImagePath: appBackgroundImagePath ?? this.appBackgroundImagePath,
+      appBackgroundBlur: appBackgroundBlur ?? this.appBackgroundBlur,
       playerTheme: playerTheme ?? this.playerTheme,
       playerBackgroundImagePath: playerBackgroundImagePath ?? this.playerBackgroundImagePath,
+      playerBackgroundBlur: playerBackgroundBlur ?? this.playerBackgroundBlur,
       autoPlayNext: autoPlayNext ?? this.autoPlayNext,
       resumeSession: resumeSession ?? this.resumeSession,
       streamingQuality: streamingQuality ?? this.streamingQuality,
@@ -112,8 +124,10 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       visualizerEnabled: box.get('visualizerEnabled', defaultValue: true),
       playerStyle: box.get('playerStyle', defaultValue: 'Circle'),
       appBackgroundImagePath: box.get('appBackgroundImagePath', defaultValue: ''),
+      appBackgroundBlur: box.get('appBackgroundBlur', defaultValue: 3.0),
       playerTheme: box.get('playerTheme', defaultValue: 'Dynamic'),
       playerBackgroundImagePath: box.get('playerBackgroundImagePath', defaultValue: ''),
+      playerBackgroundBlur: box.get('playerBackgroundBlur', defaultValue: 3.0),
       autoPlayNext: box.get('autoPlayNext', defaultValue: true),
       resumeSession: box.get('resumeSession', defaultValue: true),
       streamingQuality: box.get('streamingQuality', defaultValue: 'High'),
@@ -136,8 +150,10 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     box.put('visualizerEnabled', state.visualizerEnabled);
     box.put('playerStyle', state.playerStyle);
     box.put('appBackgroundImagePath', state.appBackgroundImagePath);
+    box.put('appBackgroundBlur', state.appBackgroundBlur);
     box.put('playerTheme', state.playerTheme);
     box.put('playerBackgroundImagePath', state.playerBackgroundImagePath);
+    box.put('playerBackgroundBlur', state.playerBackgroundBlur);
     box.put('autoPlayNext', state.autoPlayNext);
     box.put('resumeSession', state.resumeSession);
     box.put('streamingQuality', state.streamingQuality);
@@ -154,9 +170,14 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   void setAccentColor(String color) => _update(state.copyWith(accentColor: color));
   void toggleVisualizer(bool value) => _update(state.copyWith(visualizerEnabled: value));
   void setPlayerStyle(String style) => _update(state.copyWith(playerStyle: style));
+  
   void setAppBackgroundImagePath(String path) => _update(state.copyWith(appBackgroundImagePath: path));
+  void setAppBackgroundBlur(double value) => _update(state.copyWith(appBackgroundBlur: value));
+  
   void setPlayerTheme(String theme) => _update(state.copyWith(playerTheme: theme));
   void setPlayerBackgroundImagePath(String path) => _update(state.copyWith(playerBackgroundImagePath: path));
+  void setPlayerBackgroundBlur(double value) => _update(state.copyWith(playerBackgroundBlur: value));
+
   void clearAppBackground() => _update(state.copyWith(appBackgroundImagePath: ''));
   void clearPlayerBackground() => _update(state.copyWith(playerBackgroundImagePath: ''));
   
