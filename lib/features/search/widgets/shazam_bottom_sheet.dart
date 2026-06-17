@@ -555,6 +555,24 @@ class _ShazamBottomSheetState extends ConsumerState<ShazamBottomSheet>
                 fontWeight: FontWeight.bold,
               ),
             ),
+            if (track?.isPreviewOnly ?? false) ...[
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.secondary.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '30s Preview Only',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.secondary,
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 8),
             Text(
               '$artist • $album',
@@ -752,6 +770,33 @@ class _ShazamBottomSheetState extends ConsumerState<ShazamBottomSheet>
   }
 
   Widget _buildDownloadAction(ThemeData theme, OnlineTrack track) {
+    if (track.isPreviewOnly) {
+      return Container(
+        width: 56,
+        height: 56,
+        decoration: BoxDecoration(
+          color: theme.colorScheme.onSurface.withOpacity(0.04),
+          shape: BoxShape.circle,
+          border: Border.all(color: theme.colorScheme.onSurface.withOpacity(0.06)),
+        ),
+        child: IconButton(
+          icon: Icon(
+            Icons.download_for_offline_rounded,
+            size: 28,
+            color: theme.colorScheme.onSurface.withOpacity(0.3),
+          ),
+          onPressed: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Downloading is disabled for preview-only tracks.'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          },
+        ),
+      );
+    }
+
     final downloadProgress = ref.watch(downloadingTracksProvider)[track.id];
     final isDownloading = downloadProgress != null;
 

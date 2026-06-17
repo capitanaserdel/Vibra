@@ -46,6 +46,8 @@ void main() async {
   );
 }
 
+final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+
 class MusicApp extends ConsumerWidget {
   const MusicApp({super.key});
 
@@ -55,6 +57,7 @@ class MusicApp extends ConsumerWidget {
     
     return MaterialApp(
       title: 'Vibra',
+      scaffoldMessengerKey: scaffoldMessengerKey,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.generateTheme(settings),
       home: const MainLayout(),

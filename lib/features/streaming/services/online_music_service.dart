@@ -91,6 +91,16 @@ class OnlineMusicService {
   }
 
   Future<List<OnlineTrack>> searchSongs(String query) async {
+    // Try JioSaavn first (for full-length songs)
+    final jioResults = await _searchJioSaavnSongs(query);
+    if (jioResults.isNotEmpty) {
+      return jioResults;
+    }
+    // Fallback to Deezer (for international songs search coverage)
+    return _searchDeezerSongs(query);
+  }
+
+  Future<List<OnlineTrack>> _searchJioSaavnSongs(String query) async {
     try {
       final response = await http.get(
         Uri.parse('https://jiosaavn-api-beta.vercel.app/search/songs?query=${Uri.encodeComponent(query)}'),
@@ -109,7 +119,25 @@ class OnlineMusicService {
         }
       }
     } catch (e) {
-      print("Error searching songs: $e");
+      print("Error searching JioSaavn songs: $e");
+    }
+    return [];
+  }
+
+  Future<List<OnlineTrack>> _searchDeezerSongs(String query) async {
+    try {
+      final response = await http.get(
+        Uri.parse('https://api.deezer.com/search?q=${Uri.encodeComponent(query)}'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> body = json.decode(response.body);
+        final List<dynamic> data = body['data'] ?? [];
+        return data.map((json) => OnlineTrack.fromJson(json)).toList();
+      }
+    } catch (e) {
+      print("Error searching Deezer songs: $e");
     }
     return [];
   }
@@ -123,6 +151,7 @@ class OnlineTrack {
   final String coverUrl;
   final String previewUrl;
   final int duration;
+  final bool isPreviewOnly;
 
   OnlineTrack({
     required this.id,
@@ -132,32 +161,50 @@ class OnlineTrack {
     required this.coverUrl,
     required this.previewUrl,
     required this.duration,
+    this.isPreviewOnly = false,
   });
 
   factory OnlineTrack.fromJson(Map<String, dynamic> json) {
-    final imageList = json['image'] as List<dynamic>? ?? [];
-    String coverUrl = '';
-    if (imageList.isNotEmpty) {
-      coverUrl = imageList.last['link'] ?? '';
+    final isDeezer = json.containsKey('preview');
+    if (isDeezer) {
+      final artistMap = json['artist'] as Map<String, dynamic>? ?? {};
+      final albumMap = json['album'] as Map<String, dynamic>? ?? {};
+      return OnlineTrack(
+        id: 'deezer_${json['id']}',
+        title: json['title'] ?? 'Unknown Title',
+        artist: artistMap['name'] ?? 'Unknown Artist',
+        album: albumMap['title'] ?? 'Unknown Album',
+        coverUrl: albumMap['cover_medium'] ?? albumMap['cover'] ?? '',
+        previewUrl: json['preview'] ?? '',
+        duration: json['duration'] ?? 0,
+        isPreviewOnly: true,
+      );
+    } else {
+      final imageList = json['image'] as List<dynamic>? ?? [];
+      String coverUrl = '';
+      if (imageList.isNotEmpty) {
+        coverUrl = imageList.last['link'] ?? '';
+      }
+
+      final downloadUrlList = json['downloadUrl'] as List<dynamic>? ?? [];
+      String previewUrl = '';
+      if (downloadUrlList.isNotEmpty) {
+        previewUrl = downloadUrlList.last['link'] ?? '';
+      }
+
+      final albumMap = json['album'] as Map<String, dynamic>? ?? {};
+      final albumName = albumMap['name'] ?? 'Unknown Album';
+
+      return OnlineTrack(
+        id: json['id']?.toString() ?? '',
+        title: json['name'] ?? 'Unknown Title',
+        artist: json['primaryArtists'] ?? 'Unknown Artist',
+        album: albumName,
+        coverUrl: coverUrl,
+        previewUrl: previewUrl,
+        duration: int.tryParse(json['duration']?.toString() ?? '') ?? 0,
+        isPreviewOnly: false,
+      );
     }
-
-    final downloadUrlList = json['downloadUrl'] as List<dynamic>? ?? [];
-    String previewUrl = '';
-    if (downloadUrlList.isNotEmpty) {
-      previewUrl = downloadUrlList.last['link'] ?? '';
-    }
-
-    final albumMap = json['album'] as Map<String, dynamic>? ?? {};
-    final albumName = albumMap['name'] ?? 'Unknown Album';
-
-    return OnlineTrack(
-      id: json['id']?.toString() ?? '',
-      title: json['name'] ?? 'Unknown Title',
-      artist: json['primaryArtists'] ?? 'Unknown Artist',
-      album: albumName,
-      coverUrl: coverUrl,
-      previewUrl: previewUrl,
-      duration: int.tryParse(json['duration']?.toString() ?? '') ?? 0,
-    );
   }
 }

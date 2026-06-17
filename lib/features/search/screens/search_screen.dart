@@ -765,16 +765,40 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 child: ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   leading: _buildArtwork(track.coverUrl),
-                  title: Text(
-                    track.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: isCurrentTrack
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).colorScheme.onSurface,
-                    ),
+                  title: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          track.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: isCurrentTrack
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
+                      if (track.isPreviewOnly) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.secondary.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'Preview',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.secondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   subtitle: Text(
                     '${track.artist} • ${track.album}',
@@ -838,6 +862,24 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Widget _buildDownloadButton(WidgetRef ref, OnlineTrack track) {
+    if (track.isPreviewOnly) {
+      return IconButton(
+        icon: Icon(
+          Icons.download_for_offline_rounded,
+          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.2),
+          size: 24,
+        ),
+        onPressed: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Downloading is disabled for preview-only tracks.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        },
+      );
+    }
+
     final downloadProgress = ref.watch(downloadingTracksProvider)[track.id];
     final isDownloading = downloadProgress != null;
 

@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:music/features/settings/providers/settings_provider.dart';
 import 'package:music/features/settings/widgets/settings_widgets.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:music/features/library/providers/music_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -153,6 +154,30 @@ class SettingsScreen extends ConsumerWidget {
                       return DropdownMenuItem(value: q, child: Text(q));
                     }).toList(),
                     onChanged: (val) => notifier.setStreamingQuality(val!),
+                  ),
+                ),
+                SettingsTile(
+                  icon: Icons.cloud_outlined,
+                  title: 'Search & Streaming Provider',
+                  subtitle: 'Change if streaming fails in your region',
+                  trailing: ValueListenableBuilder(
+                    valueListenable: Hive.box('settings_box').listenable(keys: ['streaming_provider']),
+                    builder: (context, box, _) {
+                      final provider = box.get('streaming_provider', defaultValue: 'jiosaavn');
+                      return DropdownButton<String>(
+                        value: provider,
+                        dropdownColor: Theme.of(context).colorScheme.surface,
+                        underline: Container(),
+                        items: const [
+                          DropdownMenuItem(value: 'jiosaavn', child: Text('JioSaavn (Full, India)')),
+                          DropdownMenuItem(value: 'deezer', child: Text('Deezer (Previews, Global)')),
+                        ],
+                        onChanged: (val) {
+                          box.put('streaming_provider', val);
+                          ref.invalidate(searchedSongsProvider);
+                        },
+                      );
+                    },
                   ),
                 ),
               ],

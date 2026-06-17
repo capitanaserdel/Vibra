@@ -3,6 +3,8 @@ import 'package:just_audio/just_audio.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'dart:convert';
 import 'package:flutter/services.dart';
+import 'package:flutter/material.dart';
+import 'package:music/main.dart';
 
 class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
   final _player = AudioPlayer();
@@ -203,6 +205,19 @@ class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
       play();
     } catch (e) {
       print("Error playing from URI: $e");
+      _player.stop();
+      
+      // Notify user of playback errors (such as geo-restrictions on saavncdn.com)
+      scaffoldMessengerKey.currentState?.removeCurrentSnackBar();
+      scaffoldMessengerKey.currentState?.showSnackBar(
+        SnackBar(
+          content: Text(uri.toString().contains('saavncdn.com')
+              ? 'Playback failed. JioSaavn might be geo-restricted. Try changing Search Provider in settings.'
+              : 'Playback failed. Unable to load audio stream.'),
+          backgroundColor: Colors.red.shade800,
+          duration: const Duration(seconds: 6),
+        ),
+      );
     }
   }
 
