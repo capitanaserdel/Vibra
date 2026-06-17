@@ -30,17 +30,44 @@ final localSongsProvider = FutureProvider<List<SongModel>>((ref) async {
   filteredSongs.sort((a, b) {
     int result;
     switch (sortType) {
-      case LibrarySortType.aToZ:
-        result = a.title.toLowerCase().compareTo(b.title.toLowerCase());
+      case LibrarySortType.songName:
+        final titleA = a.title.trim().toUpperCase();
+        final titleB = b.title.trim().toUpperCase();
+        
+        final isLetterA = titleA.isNotEmpty && RegExp(r'[A-Z]').hasMatch(titleA[0]);
+        final isLetterB = titleB.isNotEmpty && RegExp(r'[A-Z]').hasMatch(titleB[0]);
+        
+        if (isLetterA && !isLetterB) {
+          result = -1;
+        } else if (!isLetterA && isLetterB) {
+          result = 1;
+        } else {
+          result = titleA.compareTo(titleB);
+        }
         break;
-      case LibrarySortType.artist:
+      case LibrarySortType.artistName:
         result = (a.artist ?? '').toLowerCase().compareTo((b.artist ?? '').toLowerCase());
         break;
-      case LibrarySortType.dateAdded:
+      case LibrarySortType.albumName:
+        result = (a.album ?? '').toLowerCase().compareTo((b.album ?? '').toLowerCase());
+        break;
+      case LibrarySortType.folderName:
+        final folderA = File(a.data).parent.path.split('/').last;
+        final folderB = File(b.data).parent.path.split('/').last;
+        result = folderA.toLowerCase().compareTo(folderB.toLowerCase());
+        break;
+      case LibrarySortType.addedTime:
         result = (a.dateAdded ?? 0).compareTo(b.dateAdded ?? 0);
         break;
       case LibrarySortType.duration:
         result = (a.duration ?? 0).compareTo(b.duration ?? 0);
+        break;
+      case LibrarySortType.year:
+        final yearA = a.getMap["year"];
+        final yearB = b.getMap["year"];
+        final yA = yearA is int ? yearA : (int.tryParse(yearA?.toString() ?? '') ?? 0);
+        final yB = yearB is int ? yearB : (int.tryParse(yearB?.toString() ?? '') ?? 0);
+        result = yA.compareTo(yB);
         break;
     }
     return isAsc ? result : -result;
@@ -74,18 +101,35 @@ final searchQueryProvider = StateProvider<String>((ref) => "");
 final librarySearchProvider = StateProvider<String>((ref) => "");
 
 // Library Sort Provider
-enum LibrarySortType { aToZ, artist, dateAdded, duration }
+enum LibrarySortType {
+  songName,
+  artistName,
+  albumName,
+  folderName,
+  addedTime,
+  duration,
+  year,
+}
 
 final librarySortTypeProvider = StateProvider<LibrarySortType>((ref) {
   final box = Hive.box('settings_box');
-  final index = box.get('library_sort_index', defaultValue: LibrarySortType.dateAdded.index);
+  final index = box.get('library_sort_index', defaultValue: LibrarySortType.songName.index);
   return LibrarySortType.values[index];
 });
 
 final librarySortAscendingProvider = StateProvider<bool>((ref) {
   final box = Hive.box('settings_box');
-  return box.get('library_sort_ascending', defaultValue: false);
+  return box.get('library_sort_ascending', defaultValue: true);
 });
+
+// Track click count for songs to route to PlayerScreen
+class SongClickState {
+  final String? songId;
+  final int clickCount;
+  SongClickState({this.songId, this.clickCount = 0});
+}
+
+final songClickProvider = StateProvider<SongClickState>((ref) => SongClickState());
 
 // Extension to help updating sorting with persistence
 extension SortPersistence on WidgetRef {

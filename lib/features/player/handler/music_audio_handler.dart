@@ -6,9 +6,12 @@ import 'dart:convert';
 class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
   final _player = AudioPlayer();
 
+  /// Latest Android audio session ID — null on non-Android or until first playback
+  int? audioSessionId;
+
   MusicAudioHandler() {
     // Broadcast state changes
-    _player.playbackEventStream.map(_transformEvent).pipe(playbackState);
+    _player.playbackEventStream.map(_transformEvent).listen(playbackState.add);
 
     // Listen to current processing state to handle completion
     _player.processingStateStream.listen((state) {
@@ -32,6 +35,11 @@ class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
       if (index != null && index < queue.value.length) {
         mediaItem.add(queue.value[index]);
       }
+    });
+
+    // Track audio session ID for equalizer use
+    _player.androidAudioSessionIdStream.listen((id) {
+      audioSessionId = id;
     });
 
     mediaItem.listen((item) {
@@ -132,11 +140,12 @@ class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
   @override
   Future<void> playFromUri(Uri uri, [Map<String, dynamic>? extras]) async {
     try {
-      final mediaItem = extras?['mediaItem'] as MediaItem?;
-      if (mediaItem != null) {
-        this.mediaItem.add(mediaItem);
+      final item = extras?['mediaItem'] as MediaItem?;
+      if (item != null) {
+        mediaItem.add(item);
+        // Also add to queue so the queue view is never empty for single-song plays
+        queue.add([item]);
       }
-      
       await _player.setAudioSource(_createAudioSource(uri.toString()));
       play();
     } catch (e) {

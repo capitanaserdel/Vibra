@@ -27,6 +27,7 @@ void main() async {
   await Hive.openBox('play_history_box');
   await Hive.openBox('metadata_box');
   await Hive.openBox('hidden_songs_box');
+  await Hive.openBox('playlist_box');
 
   // Initialize Audio Service
   audioHandler = await AudioService.init(

@@ -5,6 +5,10 @@ class MusicLibraryService {
   final OnAudioQuery _audioQuery = OnAudioQuery();
 
   Future<bool> requestPermission() async {
+    if (await Permission.audio.isGranted ||
+        await Permission.storage.isGranted) {
+      return true;
+    }
     if (await Permission.audio.request().isGranted ||
         await Permission.storage.request().isGranted) {
       return true;
@@ -25,10 +29,14 @@ class MusicLibraryService {
   }
 
   Future<List<AlbumModel>> fetchAlbums() async {
+    bool hasPermission = await requestPermission();
+    if (!hasPermission) return [];
     return await _audioQuery.queryAlbums();
   }
 
   Future<List<ArtistModel>> fetchArtists() async {
+    bool hasPermission = await requestPermission();
+    if (!hasPermission) return [];
     return await _audioQuery.queryArtists();
   }
 

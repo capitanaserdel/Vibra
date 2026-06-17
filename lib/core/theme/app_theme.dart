@@ -11,8 +11,14 @@ class AppTheme {
   };
 
   static ThemeData generateTheme(SettingsState settings) {
-    final bool isLight = settings.themeMode == 'Light';
-    final bool isAmoled = settings.themeMode == 'AMOLED';
+    String mode = settings.themeMode;
+    if (mode == 'System') {
+      final brightness = WidgetsBinding.instance.platformDispatcher.platformBrightness;
+      mode = brightness == Brightness.dark ? 'Dark' : 'Light';
+    }
+
+    final bool isLight = mode == 'Light';
+    final bool isAmoled = mode == 'AMOLED';
     final Color primaryColor = accentPresets[settings.accentColor] ?? accentPresets['Green']!;
 
     final ColorScheme colorScheme = isLight

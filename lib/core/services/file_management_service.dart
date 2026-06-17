@@ -24,13 +24,21 @@ class FileManagementService {
   }
 
   /// Deletes a song file using Native MediaStore ID or direct file deletion.
-  Future<bool> deleteSong(int id, String path) async {
+  /// Returns true on success, false on failure, and null if the user cancelled the request.
+  Future<bool?> deleteSong(int id, String path, String? uri) async {
     try {
       final bool result = await _channel.invokeMethod('deleteFile', {
         'id': id,
         'path': path,
+        'uri': uri,
       });
       return result;
+    } on PlatformException catch (e) {
+      print('PlatformException deleting song: ${e.code} - ${e.message}');
+      if (e.code == 'CANCELLED') {
+        return null;
+      }
+      return false;
     } catch (e) {
       print('Error deleting song: $e');
       return false;
@@ -54,6 +62,11 @@ class FileManagementService {
     } else {
       await box.put(songId, true);
     }
+  }
+
+  /// Explicitly hides a song in Hive.
+  Future<void> hideSong(int songId) async {
+    await Hive.box('hidden_songs_box').put(songId, true);
   }
 
   /// Checks if a song is hidden.

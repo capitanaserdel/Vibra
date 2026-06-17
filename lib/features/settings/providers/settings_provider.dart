@@ -6,15 +6,24 @@ import 'dart:io';
 
 class SettingsState {
   // Appearance
-  final String themeMode; // 'Light', 'Dark', 'AMOLED'
+  final String themeMode; // 'System', 'Light', 'Dark', 'AMOLED'
   final String accentColor; // 'Green', 'Blue', 'Purple', 'Orange'
   final bool visualizerEnabled;
   final String playerStyle; // 'Circle', 'Linear'
 
+  /// Path to user-picked wallpaper image for the app background. Empty = none.
+  final String appBackgroundImagePath;
+
+  /// Player page visual theme: 'Dynamic' | 'Solid' | 'Image'
+  final String playerTheme;
+
+  /// Path to user-picked image for the player background (only used when playerTheme == 'Image')
+  final String playerBackgroundImagePath;
+
   // Playback
   final bool autoPlayNext;
   final bool resumeSession;
-  final String streamingQuality; // 'Low', 'Medium', 'High'
+  final String streamingQuality;
   final bool backgroundPlayback;
 
   // Library
@@ -30,10 +39,13 @@ class SettingsState {
   final String lastSyncTime;
 
   SettingsState({
-    this.themeMode = 'Dark',
+    this.themeMode = 'System',
     this.accentColor = 'Green',
     this.visualizerEnabled = true,
     this.playerStyle = 'Circle',
+    this.appBackgroundImagePath = '',
+    this.playerTheme = 'Dynamic',
+    this.playerBackgroundImagePath = '',
     this.autoPlayNext = true,
     this.resumeSession = true,
     this.streamingQuality = 'High',
@@ -51,6 +63,9 @@ class SettingsState {
     String? accentColor,
     bool? visualizerEnabled,
     String? playerStyle,
+    String? appBackgroundImagePath,
+    String? playerTheme,
+    String? playerBackgroundImagePath,
     bool? autoPlayNext,
     bool? resumeSession,
     String? streamingQuality,
@@ -67,6 +82,9 @@ class SettingsState {
       accentColor: accentColor ?? this.accentColor,
       visualizerEnabled: visualizerEnabled ?? this.visualizerEnabled,
       playerStyle: playerStyle ?? this.playerStyle,
+      appBackgroundImagePath: appBackgroundImagePath ?? this.appBackgroundImagePath,
+      playerTheme: playerTheme ?? this.playerTheme,
+      playerBackgroundImagePath: playerBackgroundImagePath ?? this.playerBackgroundImagePath,
       autoPlayNext: autoPlayNext ?? this.autoPlayNext,
       resumeSession: resumeSession ?? this.resumeSession,
       streamingQuality: streamingQuality ?? this.streamingQuality,
@@ -89,10 +107,13 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   void _loadSettings() {
     final box = Hive.box('settings_box');
     state = SettingsState(
-      themeMode: box.get('themeMode', defaultValue: 'Dark'),
+      themeMode: box.get('themeMode', defaultValue: 'System'),
       accentColor: box.get('accentColor', defaultValue: 'Green'),
       visualizerEnabled: box.get('visualizerEnabled', defaultValue: true),
       playerStyle: box.get('playerStyle', defaultValue: 'Circle'),
+      appBackgroundImagePath: box.get('appBackgroundImagePath', defaultValue: ''),
+      playerTheme: box.get('playerTheme', defaultValue: 'Dynamic'),
+      playerBackgroundImagePath: box.get('playerBackgroundImagePath', defaultValue: ''),
       autoPlayNext: box.get('autoPlayNext', defaultValue: true),
       resumeSession: box.get('resumeSession', defaultValue: true),
       streamingQuality: box.get('streamingQuality', defaultValue: 'High'),
@@ -114,6 +135,9 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     box.put('accentColor', state.accentColor);
     box.put('visualizerEnabled', state.visualizerEnabled);
     box.put('playerStyle', state.playerStyle);
+    box.put('appBackgroundImagePath', state.appBackgroundImagePath);
+    box.put('playerTheme', state.playerTheme);
+    box.put('playerBackgroundImagePath', state.playerBackgroundImagePath);
     box.put('autoPlayNext', state.autoPlayNext);
     box.put('resumeSession', state.resumeSession);
     box.put('streamingQuality', state.streamingQuality);
@@ -130,6 +154,11 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   void setAccentColor(String color) => _update(state.copyWith(accentColor: color));
   void toggleVisualizer(bool value) => _update(state.copyWith(visualizerEnabled: value));
   void setPlayerStyle(String style) => _update(state.copyWith(playerStyle: style));
+  void setAppBackgroundImagePath(String path) => _update(state.copyWith(appBackgroundImagePath: path));
+  void setPlayerTheme(String theme) => _update(state.copyWith(playerTheme: theme));
+  void setPlayerBackgroundImagePath(String path) => _update(state.copyWith(playerBackgroundImagePath: path));
+  void clearAppBackground() => _update(state.copyWith(appBackgroundImagePath: ''));
+  void clearPlayerBackground() => _update(state.copyWith(playerBackgroundImagePath: ''));
   
   void setAutoPlayNext(bool value) => _update(state.copyWith(autoPlayNext: value));
   void setResumeSession(bool value) => _update(state.copyWith(resumeSession: value));

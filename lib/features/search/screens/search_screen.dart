@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:music/features/library/providers/music_provider.dart';
 import 'package:music/features/player/providers/player_provider.dart';
+import 'package:music/features/player/screens/player_screen.dart';
 import 'package:music/core/utils/metadata_helper.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 
@@ -90,7 +91,25 @@ class _SearchScreenState extends ConsumerState<SearchScreen> with SingleTickerPr
               leading: QueryArtworkWidget(id: song.id, type: ArtworkType.AUDIO),
               title: Text(MetadataHelper.cleanMetadata(song.title, song.displayName), style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
               subtitle: Text(MetadataHelper.cleanArtist(song.artist), style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
-              onTap: () => ref.read(playerNotifierProvider.notifier).playSong(song),
+              onTap: () {
+                final clickState = ref.read(songClickProvider);
+                final songUri = song.uri ?? song.data;
+                
+                if (clickState.songId == songUri) {
+                  final newCount = clickState.clickCount + 1;
+                  ref.read(songClickProvider.notifier).state = SongClickState(songId: songUri, clickCount: newCount);
+                  
+                  if (newCount >= 2) {
+                    ref.read(songClickProvider.notifier).state = SongClickState();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const PlayerScreen()),
+                    );
+                  }
+                } else {
+                  ref.read(songClickProvider.notifier).state = SongClickState(songId: songUri, clickCount: 1);
+                  ref.read(playerNotifierProvider.notifier).playSong(song);
+                }
+              },
             );
           },
         );

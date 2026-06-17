@@ -10,8 +10,9 @@ import 'package:music/features/library/providers/music_provider.dart';
 
 class SongActionSheet extends ConsumerWidget {
   final SongModel song;
+  final BuildContext parentContext;
 
-  const SongActionSheet({super.key, required this.song});
+  const SongActionSheet({super.key, required this.song, required this.parentContext});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -40,14 +41,14 @@ class SongActionSheet extends ConsumerWidget {
             // Phase 6 Actions
             _buildActionItem(context, Icons.edit_rounded, 'Rename File', () {
               showDialog(
-                context: context,
+                context: parentContext,
                 builder: (ctx) => RenameDialog(
                   currentName: song.title,
                   onRename: (newName) async {
                     final success = await fileService.renameSong(song.data, newName);
                     if (success) {
                       ref.invalidate(localSongsProvider);
-                      _showSuccess(context, 'Song renamed!');
+                      if (parentContext.mounted) _showSuccess(parentContext, 'Song renamed!');
                     }
                   },
                 ),
@@ -55,7 +56,7 @@ class SongActionSheet extends ConsumerWidget {
             }),
             _buildActionItem(context, Icons.label_important_rounded, 'Edit Metadata', () {
               showDialog(
-                context: context,
+                context: parentContext,
                 builder: (ctx) => EditTagsDialog(
                   song: song,
                   onSave: (tags) async {
@@ -67,7 +68,7 @@ class SongActionSheet extends ConsumerWidget {
                     );
                     if (success) {
                       ref.invalidate(localSongsProvider);
-                      _showSuccess(context, 'Metadata updated!');
+                      if (parentContext.mounted) _showSuccess(parentContext, 'Metadata updated!');
                     }
                   },
                 ),
@@ -76,27 +77,28 @@ class SongActionSheet extends ConsumerWidget {
             _buildActionItem(context, isHidden ? Icons.visibility_rounded : Icons.visibility_off_rounded, isHidden ? 'Unhide Song' : 'Hide Song', () async {
               await fileService.toggleHideSong(song.id);
               ref.invalidate(localSongsProvider);
-              _showSuccess(context, isHidden ? 'Song visible again' : 'Song hidden');
+              if (parentContext.mounted) _showSuccess(parentContext, isHidden ? 'Song visible again' : 'Song hidden');
             }),
             _buildActionItem(context, Icons.music_note_rounded, 'Set as Ringtone', () async {
               final success = await fileService.setAsRingtone(song.data, song.title);
               if (success) {
-                _showSuccess(context, 'Ringtone set successfully!');
+                if (parentContext.mounted) _showSuccess(parentContext, 'Ringtone set successfully!');
               }
             }),
             _buildActionItem(context, Icons.delete_outline_rounded, 'Delete permanently', () async {
-              final confirm = await _showDeleteConfirm(context);
+              final confirm = await _showDeleteConfirm(parentContext);
               if (confirm == true) {
                 try {
-                  final success = await fileService.deleteSong(song.id, song.data);
-                  if (success) {
+                  final success = await fileService.deleteSong(song.id, song.data, song.uri);
+                  if (success == true) {
+                    await fileService.hideSong(song.id);
                     ref.invalidate(localSongsProvider);
-                    if (context.mounted) _showSuccess(context, 'Song deleted');
-                  } else {
-                    if (context.mounted) _showErrorWithSettings(context, 'Permission denied', fileService);
+                    if (parentContext.mounted) _showSuccess(parentContext, 'Song deleted');
+                  } else if (success == false) {
+                    if (parentContext.mounted) _showErrorWithSettings(parentContext, 'Permission denied', fileService);
                   }
                 } catch (e) {
-                  if (context.mounted) _showErrorWithSettings(context, 'Deletion failed', fileService);
+                  if (parentContext.mounted) _showErrorWithSettings(parentContext, 'Deletion failed', fileService);
                 }
               }
             }, color: Colors.redAccent),
@@ -219,6 +221,6 @@ void showSongActionSheet(BuildContext context, SongModel song) {
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (context) => SongActionSheet(song: song),
+    builder: (sheetContext) => SongActionSheet(song: song, parentContext: context),
   );
 }

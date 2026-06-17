@@ -1,3 +1,4 @@
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:music/features/player/lyrics/providers/lyrics_provider.dart';
@@ -6,11 +7,16 @@ import '../../../core/utils/metadata_helper.dart';
 import '../providers/player_provider.dart';
 
 class LyricsView extends ConsumerWidget {
-  const LyricsView({super.key});
+  final MediaItem mediaItem;
+
+  const LyricsView({
+    super.key,
+    required this.mediaItem,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final lyricsAsync = ref.watch(currentLyricsProvider);
+    final lyricsAsync = ref.watch(currentLyricsProvider(mediaItem));
 
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
@@ -34,7 +40,7 @@ class LyricsView extends ConsumerWidget {
                   children: [
                     TextButton.icon(
                       icon: const Icon(Icons.refresh_rounded, size: 18),
-                      onPressed: () => ref.invalidate(currentLyricsProvider),
+                      onPressed: () => ref.invalidate(currentLyricsProvider(mediaItem)),
                       label: const Text('Retry'),
                     ),
                     const SizedBox(width: 8),
@@ -66,7 +72,7 @@ class LyricsView extends ConsumerWidget {
                   displayLyrics,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 18,
+                     fontSize: 18,
                     height: 2.2,
                     color: onSurface,
                     fontWeight: FontWeight.w500,
@@ -117,11 +123,12 @@ class LyricsView extends ConsumerWidget {
   }
 
   void _showManualSearchDialog(BuildContext context, WidgetRef ref) {
-    final mediaItem = ref.read(currentMediaItemProvider).value;
-    if (mediaItem == null) return;
-
-    final titleController = TextEditingController(text: MetadataHelper.stripNoise(mediaItem.title));
-    final artistController = TextEditingController(text: MetadataHelper.getMainArtist(mediaItem.artist));
+    final titleController = TextEditingController(
+      text: ref.read(manualLyricsQueryProvider(mediaItem.id))?['title'] ?? MetadataHelper.stripNoise(mediaItem.title)
+    );
+    final artistController = TextEditingController(
+      text: ref.read(manualLyricsQueryProvider(mediaItem.id))?['artist'] ?? MetadataHelper.getMainArtist(mediaItem.artist)
+    );
     final theme = Theme.of(context);
 
     showDialog(
@@ -149,7 +156,7 @@ class LyricsView extends ConsumerWidget {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () {
-              ref.read(manualLyricsQueryProvider.notifier).state = {
+              ref.read(manualLyricsQueryProvider(mediaItem.id).notifier).state = {
                 'title': titleController.text.trim(),
                 'artist': artistController.text.trim(),
               };
