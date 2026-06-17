@@ -154,6 +154,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     return true;
   }
 
+  String _getTrackExtension(OnlineTrack track) {
+    try {
+      final uri = Uri.parse(track.previewUrl);
+      String ext = p.extension(uri.path);
+      if (ext == '.mp4') return '.m4a';
+      return ext.isNotEmpty ? ext : '.mp3';
+    } catch (_) {
+      return '.mp3';
+    }
+  }
+
   Future<bool> _isTrackDownloaded(OnlineTrack track) async {
     try {
       final fileService = ref.read(fileManagementServiceProvider);
@@ -161,9 +172,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       if (outputDir == null) return false;
       final sanitizedTitle = track.title.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
       final sanitizedArtist = track.artist.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
-      final filename = '${sanitizedTitle}_$sanitizedArtist.mp3';
-      final file = File(p.join(outputDir.path, filename));
-      return await file.exists();
+      
+      final legacyFile = File(p.join(outputDir.path, '${sanitizedTitle}_$sanitizedArtist.mp3'));
+      if (await legacyFile.exists()) return true;
+
+      final ext = _getTrackExtension(track);
+      if (ext != '.mp3') {
+        final correctFile = File(p.join(outputDir.path, '${sanitizedTitle}_$sanitizedArtist$ext'));
+        if (await correctFile.exists()) return true;
+      }
+      return false;
     } catch (e) {
       return false;
     }
@@ -196,7 +214,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
       final sanitizedTitle = track.title.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
       final sanitizedArtist = track.artist.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
-      final filename = '${sanitizedTitle}_$sanitizedArtist.mp3';
+      final ext = _getTrackExtension(track);
+      final filename = '${sanitizedTitle}_$sanitizedArtist$ext';
       final file = File(p.join(outputDir.path, filename));
       final sink = file.openWrite();
 

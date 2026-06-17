@@ -87,7 +87,8 @@ class LibraryScreen extends ConsumerWidget {
                     final onAudioQuery = OnAudioQuery();
                     final files = downloadDir.listSync();
                     for (final entity in files) {
-                      if (entity is File && entity.path.endsWith('.mp3')) {
+                      final path = entity.path.toLowerCase();
+                      if (entity is File && (path.endsWith('.mp3') || path.endsWith('.m4a'))) {
                         await onAudioQuery.scanMedia(entity.path);
                       }
                     }
